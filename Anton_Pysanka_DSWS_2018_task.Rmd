@@ -1,0 +1,324 @@
+---
+title: "Regression-type modeling & time series decomposition of Beer, wine & liquor sales in U.S. in 1992 - 2017"
+author: "Anton Pysanka"
+date: '2018-12-02'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Data loading
+
+Our data: BeerWineUS.csv - monthly retail sales of beer, wine and liquor in the U.S. in January 1992 - November 2017 (Source: Federal Reserve Bank of St. Louis).
+
+! File BeerWineUS.csv have to be in working directory for correct execution of the code.
+
+The last 5 years of data will be cutted for the test purpose.
+
+```{r data_loading, echo=FALSE, include=FALSE}
+library(readr)
+library(xts)
+library(lubridate)
+BeerWineUS <- read_csv("BeerWineUS.csv", col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+colnames(BeerWineUS) <- c('Date', 'Retail sales')
+
+# We need xts and ts types of series for future purposes
+BeerWineUS_xts <- xts(x = BeerWineUS$`Retail sales`, order.by = BeerWineUS$Date)
+BeerWineUS_ts <- ts(BeerWineUS_xts, start = c(year(start(BeerWineUS_xts)),
+                                              month(start(BeerWineUS_xts))), 
+                    end = c(year(end(BeerWineUS_xts)),
+                            month(end(BeerWineUS_xts))), frequency = 12)
+BeerWineUS_xts_test <- tail(BeerWineUS_xts, 5*12)
+BeerWineUS_xts_train <- head(BeerWineUS_xts, -5*12)
+BeerWineUS_ts_test <- ts(BeerWineUS_xts_test, start = c(year(start(BeerWineUS_xts_test)),
+                                              month(start(BeerWineUS_xts_test))), 
+                       end = c(year(end(BeerWineUS_xts_test)),
+                               month(end(BeerWineUS_xts_test))), frequency = 12)
+BeerWineUS_ts_train <- ts(BeerWineUS_xts_train, start = c(year(start(BeerWineUS_xts_train)),
+                                              month(start(BeerWineUS_xts_train))), 
+                       end = c(year(end(BeerWineUS_xts_train)),
+                               month(end(BeerWineUS_xts_train))), frequency = 12)
+```
+
+## General time-series plot
+
+```{r plotting, echo=FALSE}
+library(ggplot2)
+ggplot(BeerWineUS_xts, aes(index(BeerWineUS_xts), coredata(BeerWineUS_xts))) + geom_line(color = 'blue') +
+  scale_x_date(breaks = index(BeerWineUS_xts)[seq(to = length(BeerWineUS_xts), by = 12)]) +
+  labs(x = 'Months', y = 'Retail sales',
+       title = 'Retail sales of beer, wine and liquor in the U.S.',
+       subtitle = 'Monthly data from January 1992 till November 2017',
+       caption = 'Source: Federal Reserve Bank of St. Louis') +
+  theme_light() + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  geom_vline(aes(xintercept = date('1996-01-01')), color = 'red', size = 0.3, linetype = 3)
+```
+
+Red line marks an approximate start of the sales growth (1996).
+
+# Regression-type modelling and forecasting
+
+## Linear regression on the months
+
+```{r lm_month, echo=FALSE}
+lm_w_month_var <- lm(coredata(BeerWineUS_xts_train) ~ month(index(BeerWineUS_xts_train)))
+summary(lm_w_month_var)
+
+ggplot() + geom_line(aes(index(BeerWineUS_xts_train), coredata(BeerWineUS_xts_train), color = 'Original')) +
+  geom_line(aes(index(BeerWineUS_xts_train), lm_w_month_var$fitted.values, color = 'Fitted')) +
+  scale_colour_manual('', values = c('Fitted'='red','Original'='blue')) +
+  labs(x = 'Months', y = 'Retail sales',
+       title = 'Original retail sales vs. fitted values of LM on months') +
+  scale_x_date(breaks = index(BeerWineUS_xts_train)[seq(to = length(BeerWineUS_xts_train), by = 12)]) +
+  theme_light() + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+As we can see, we havent extracted trend & and in-year seasonal periond by applying months as a predictor, and months are not significant as a predictor in LM. Only some seasonal component for sales growth in december each year. Then we have to check ACF of model residuals & do Durbin-Watson test.
+
+```{r resid_tests, echo=FALSE}
+library(lmtest)
+dwtest(lm_w_month_var)
+plot(acf(lm_w_month_var$residuals, plot = F),
+     main = 'Residuals ACF of linear regression on months')
+```
+
+ACF plot shows us a lot of unextracted information on every lag of autocorelation & Durbin-Watson test for autocorrelation of disturbances also tells that there's sagnificant autocorrelation.
+
+```{r service_functions, echo=FALSE, include=FALSE}
+# Function to get all dummy variables for all needed data splits
+get_dummies <- function(xts_data){
+  quarters <- quarter(index(xts_data))
+  years <- year(index(xts_data))
+  growth <- ifelse(years < 1996, 0, 1)
+  months <- month(xts_data)
+  month_periods <- ifelse(months <= 7, 1,
+                          ifelse(months %in% 8:9, 2,
+                                 ifelse(months %in% 10:11, 3, 4)))
+  is_december <- ifelse(months == 12, 1, 0)
+  return(data.frame(years, quarters, months, month_periods, is_december, growth))
+}
+
+# Train and test dummies
+vars_train <- get_dummies(BeerWineUS_xts_train)
+vars_test <- get_dummies(BeerWineUS_xts_test)
+
+# Function to get names of used in linear model predictors
+get_lm_predictors_names <- function(model){
+  sub('[[:alpha:][:punct:]]+\\$', '', colnames(model$model)[-1])
+}
+
+# Function for plotting the linear approximation results and the original values on the same plot
+plot_orig_vs_pred <- function(xts_data, predictions, variables){
+  ggplot() + geom_line(aes(index(xts_data), coredata(xts_data), color = 'Original')) +
+    geom_line(aes(index(xts_data), predictions, color = 'Fitted')) +
+    scale_colour_manual('', values = c('Fitted'='red','Original'='blue')) +
+    labs(x = 'Months', y = 'Retail sales',
+         title = 'Original retail sales vs. predicted values of LM',
+         subtitle = paste0('Features: ', paste(variables, collapse = ', '))) +
+    scale_x_date(breaks = index(xts_data)[seq(to = length(xts_data), by = 12)]) +
+    theme_light() + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+}
+```
+
+## Month- and seasonplots
+
+```{r moth_and_seasonal_plotting, echo=FALSE}
+library(forecast)
+ggmonthplot(BeerWineUS_ts_train)
+ggseasonplot(BeerWineUS_ts_train)
+```
+
+On a monthplot we can see that there's almost consistant (with some breaks) growth for each month during the years, so maybe we have to add a year dummy variable to a regression.
+
+On a seasonalplot we see in-year growth from January to July, then decline to September, then again small growth to November and then a spike in December. So ve can also use it for creating more dummies - one for in-year periods and a separate one for spike in December.
+
+## Regression models with different variations of predictors
+
+**Predictors: years + quarters + months + growth after 1995:**
+
+```{r yr_qt_mo_grow, echo=FALSE}
+lm_yr_qt_mo_grow <- lm(coredata(BeerWineUS_xts_train) ~ vars_train$years +
+                                   vars_train$quarters + vars_train$months +
+                                   vars_train$growth)
+summary(lm_yr_qt_mo_grow)
+plot_orig_vs_pred(BeerWineUS_xts_train, lm_yr_qt_mo_grow$fitted.values,
+                  get_lm_predictors_names(lm_yr_qt_mo_grow))
+plot(acf(lm_yr_qt_mo_grow$residuals, plot = F), main = 'Residuals ACF of linear regression')
+dwtest(lm_yr_qt_mo_grow)
+```
+
+**Predictors: years + in-year periods + growth after 1995:**
+
+```{r yr_moper_grow, echo=FALSE}
+lm_yr_moper_grow <- lm(coredata(BeerWineUS_xts_train) ~
+                         vars_train$years + vars_train$month_periods + 
+                         vars_train$growth)
+summary(lm_yr_moper_grow)
+plot_orig_vs_pred(BeerWineUS_xts_train, lm_yr_moper_grow$fitted.values,
+                  get_lm_predictors_names(lm_yr_moper_grow))
+plot(acf(lm_yr_moper_grow$residuals, plot = F), main = 'Residuals ACF of linear regression')
+dwtest(lm_yr_moper_grow)
+```
+
+**Predictors: years + quarters + months + December spike + growth after 1995:**
+
+```{r yr_qt_mo_dec_grow, echo=FALSE}
+lm_yr_qt_mo_dec_grow <- lm(coredata(BeerWineUS_xts_train) ~
+                             vars_train$years + vars_train$quarters + 
+                             vars_train$months + vars_train$is_december +
+                             vars_train$growth)
+summary(lm_yr_qt_mo_dec_grow)
+plot_orig_vs_pred(BeerWineUS_xts_train, lm_yr_qt_mo_dec_grow$fitted.values,
+                  get_lm_predictors_names(lm_yr_qt_mo_dec_grow))
+plot(acf(lm_yr_qt_mo_dec_grow$residuals, plot = F), main = 'Residuals ACF of linear regression')
+dwtest(lm_yr_qt_mo_dec_grow)
+```
+
+**Predictors: years + months + in-year periods + December spike + growth after 1995:**
+
+```{r yr_mo_moper_dec_grow, echo=FALSE}
+lm_yr_mo_moper_dec_grow <- lm(coredata(BeerWineUS_xts_train) ~
+                                vars_train$years + vars_train$month_periods + 
+                                vars_train$months + vars_train$is_december +
+                                vars_train$growth)
+summary(lm_yr_mo_moper_dec_grow)
+plot_orig_vs_pred(BeerWineUS_xts_train, lm_yr_mo_moper_dec_grow$fitted.values,
+                  get_lm_predictors_names(lm_yr_mo_moper_dec_grow))
+plot(acf(lm_yr_mo_moper_dec_grow$residuals, plot = F), main = 'Residuals ACF of linear regression')
+dwtest(lm_yr_mo_moper_dec_grow)
+```
+
+**Predictors: years + quarters + months + in-year periods + December spike + growth after 1995 (all dummy features):**
+
+```{r yr_qt_mo_moper_dec_grow, echo=FALSE}
+yr_qt_mo_moper_dec_grow = cbind(coredata(BeerWineUS_xts_train), vars_train)
+lm_yr_qt_mo_moper_dec_grow <- lm(yr_qt_mo_moper_dec_grow)
+summary(lm_yr_qt_mo_moper_dec_grow)
+plot_orig_vs_pred(BeerWineUS_xts_train, lm_yr_qt_mo_moper_dec_grow$fitted.values,
+                  get_lm_predictors_names(lm_yr_qt_mo_moper_dec_grow))
+plot(acf(lm_yr_qt_mo_moper_dec_grow$residuals, plot = F), main = 'Residuals ACF of linear regression')
+dwtest(lm_yr_qt_mo_moper_dec_grow)
+```
+
+At firs sight, better modeling results we receive adding all or almost all predictors.
+If we do not add the in-year periods we have a straight line during the year;
+If we do not add December spike vpredictor, we do not cover yearly December sales growth;
+If we do not add moths as a variable, we do not cover January decline.
+
+Then we have to look at the loss-functions MSE, MAE, MAPE and also consider AIC.
+
+```{r metrics, echo=FALSE, include=FALSE}
+models_list <- list(lm_yr_qt_mo_grow, lm_yr_qt_mo_moper_dec_grow, lm_yr_qt_mo_dec_grow,
+                    lm_yr_moper_grow, lm_yr_mo_moper_dec_grow)
+
+library(Metrics)
+loss_functions = function(y, y_hat){
+    return(cbind(mse(y, y_hat), mae(y, y_hat), mape(y, y_hat)))
+}
+
+metrics_on_train <- t(sapply(models_list, function(x) cbind(loss_functions(coredata(BeerWineUS_xts_train), x$fitted.values), AIC(x))))
+colnames(metrics_on_train) <- c('MSE', 'MAE', 'MAPE', 'AIC')
+get_modelnames <- function(list){
+  names <- c()
+  for(i in 1:length(list)){
+    names[i] = paste(lapply(list, function(x) get_lm_predictors_names(x))[[i]],
+                     collapse = ' + ')
+  }
+  return(names)
+}
+rownames(metrics_on_train) <- get_modelnames(models_list)
+metrics_on_train
+```
+
+Model with all possible variables hav the best results by all the metrics between compared models, so we'll use it to try to predict sales on the test set.
+
+```{r test, echo=FALSE}
+predicted_sales <- predict(lm_yr_qt_mo_moper_dec_grow,
+                           newdata = get_dummies(BeerWineUS_xts_test))
+
+Predicted_sales_xts = xts(predicted_sales, order.by = index(BeerWineUS_xts_test))
+
+ggplot() + geom_line(aes(index(BeerWineUS_xts), coredata(BeerWineUS_xts), color = 'Original')) +
+  geom_line(aes(index(BeerWineUS_xts_test), coredata(Predicted_sales_xts), color = 'Predicted')) +
+  scale_colour_manual('', values = c('Predicted'='red','Original'='blue')) +
+  labs(x = 'Months', y = 'Retail sales',
+       title = 'Original retail sales vs. predicted values') +
+  scale_x_date(breaks = index(BeerWineUS_xts)[seq(to = length(BeerWineUS_xts), by = 12)]) +
+  theme_light() + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+metrics_on_test <- loss_functions(coredata(BeerWineUS_xts_test), predicted_sales)
+colnames(metrics_on_test) <- c('MSE', 'MAE', 'MAPE')
+metrics_on_test
+```
+
+Sadly, but we highly underestimated growth of the sales and volatility on the test set, probably because growth is not linear and we haven't tried additional features and feature transformations. Our loss metrics give us much worde values on a test set also.
+
+# Time series decomposition
+
+## Applying moving-average smoothing to extract the trend
+
+```{r ma, echo=FALSE}
+library(forecast)
+plot(x=index(BeerWineUS_xts), y=BeerWineUS_ts,
+     main = 'Moving-averages of different orders with original time series',
+     col = 'lightgrey',
+     type = 'l', xlab='Years (monthly)', ylab='Retail sales')
+MA3 <- ma(BeerWineUS_ts, 3, centre = T)
+MA6 <- ma(BeerWineUS_ts, 6, centre = T)
+MA12 <- ma(BeerWineUS_ts, 12, centre = T)
+lines(x=index(BeerWineUS_xts), MA3, col = 'darkgreen')
+lines(x=index(BeerWineUS_xts), MA6, col = 'blue')
+lines(x=index(BeerWineUS_xts), MA12, col = 'darkred')
+legend('topleft', c('Original sales','MA3','MA6','MA12'), lty=c(1,1,1,1), lwd=c(2,2,2,2),
+       col=c('lightgrey','darkgreen','blue','darkred'), cex=0.8)
+```
+
+Moving-average of order 12 extracts appropriate trend.
+
+```{r loess, echo=FALSE}
+loess_2 <- loess(BeerWineUS_ts ~ time(BeerWineUS_ts), order = 2,
+                 family = 'gaussian', span = 0.2)
+plot(ts(BeerWineUS_ts, start = start(BeerWineUS_ts),
+                          frequency = 12) , type='l',
+     main = 'Trend, extracted by loess regression',
+     xlab = 'Years (monthly)', ylab = 'Retail sales', col = 'grey')
+Beer_trend_ts <- ts(loess_2$fitted, start = start(BeerWineUS_ts),
+                          frequency = 12)
+lines(Beer_trend_ts, col="darkred")
+```
+
+Trend, extracted by loess regression is smoother and has no NA values, unlike in moving-average technique, so I'll use fitted values of loess regression to compute seasonal & irregular components.
+
+## Seasonal & irregular components computations. Time-series decomposition
+
+```{r seasonal_irreg, echo=FALSE, include=FALSE}
+library(chron)
+n_years <- length(unique(year(BeerWineUS_xts)))
+Beer_seasonal_ts = ts(rep(tapply(BeerWineUS_ts - Beer_trend_ts,
+                                       cycle(BeerWineUS_ts - Beer_trend_ts),
+                                       mean, na.rm=T), n_years),
+                               frequency = 12, start = start(BeerWineUS_ts))
+Beer_irreg_ts <- BeerWineUS_ts - Beer_seasonal_ts - Beer_trend_ts
+```
+
+```{r decomposition, echo=FALSE}
+BeerWineUS_general_ts = ts.intersect(BeerWineUS_ts,
+                                     Beer_seasonal_ts,
+                                     Beer_trend_ts,
+                                     Beer_irreg_ts)
+plot(BeerWineUS_general_ts, plot.type ='single', col = 1:4,
+     main = 'Beer, wine & liquor sales time-series decomposition',
+     xlab = 'Years (monthly)', ylab = 'Retail sales')
+legend('topleft', c('Original sales','Trend','Seasonality','Error'), lty=c(1,1,1,1),
+       lwd=c(2,2,2,2), col=c('black','green','red','blue'), cex=0.8)
+```
+
+## Autocorrelation function plot of irregular time-series component
+
+```{r ACF_resid, echo=FALSE}
+plot(acf(Beer_irreg_ts, plot = F), main = 'ACF of the irregular component of Beer sales time-series')
+```
+
+At autocorrelation function plot we see that there's still unextracted information at the 12-th lag of irregular component, so probably we havent extracted all seasonality from the time series, maybe because of the growth, which could be not linear.
