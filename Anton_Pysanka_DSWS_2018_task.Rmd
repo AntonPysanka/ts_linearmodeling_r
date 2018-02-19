@@ -2,7 +2,7 @@
 title: "Regression-type modeling & time series decomposition of Beer, wine & liquor sales in U.S. in 1992 - 2017"
 author: "Anton Pysanka"
 date: '2018-12-02'
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
