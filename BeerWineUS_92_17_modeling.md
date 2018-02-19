@@ -1,3 +1,6 @@
+Regression-type modeling & time series decomposition
+====================================================
+
 Data loading
 ------------
 
@@ -13,7 +16,7 @@ The last 5 years of data will be cutted for the test purpose.
 General time-series plot
 ------------------------
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/plotting-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/plotting-1.png)
 
 Red line marks an approximate start of the sales growth (1996).
 
@@ -45,7 +48,7 @@ Linear regression on the months
     ## Multiple R-squared:  0.1357, Adjusted R-squared:  0.1322 
     ## F-statistic:  39.1 on 1 and 249 DF,  p-value: 1.74e-09
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/lm_month-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/lm_month-1.png)
 
 As we can see, we havent extracted trend & and in-year seasonal periond
 by applying months as a predictor, and months are not significant as a
@@ -60,7 +63,7 @@ Durbin-Watson test.
     ## DW = 0.25588, p-value < 2.2e-16
     ## alternative hypothesis: true autocorrelation is greater than 0
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/resid_tests-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/resid_tests-1.png)
 
 ACF plot shows us a lot of unextracted information on every lag of
 autocorelation & Durbin-Watson test for autocorrelation of disturbances
@@ -69,7 +72,7 @@ also tells that there's sagnificant autocorrelation.
 Month- and seasonplots
 ----------------------
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/moth_and_seasonal_plotting-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/moth_and_seasonal_plotting-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/moth_and_seasonal_plotting-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/moth_and_seasonal_plotting-2.png)
 
 On a monthplot we can see that there's almost consistant (with some
 breaks) growth for each month during the years, so maybe we have to add
@@ -108,7 +111,7 @@ Regression models with different variations of predictors
     ## Multiple R-squared:  0.8786, Adjusted R-squared:  0.8766 
     ## F-statistic:   445 on 4 and 246 DF,  p-value: < 2.2e-16
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_grow-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_grow-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_grow-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_grow-2.png)
 
     ## 
     ##  Durbin-Watson test
@@ -141,7 +144,7 @@ Regression models with different variations of predictors
     ## Multiple R-squared:  0.8605, Adjusted R-squared:  0.8588 
     ## F-statistic:   508 on 3 and 247 DF,  p-value: < 2.2e-16
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_moper_grow-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_moper_grow-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_moper_grow-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_moper_grow-2.png)
 
     ## 
     ##  Durbin-Watson test
@@ -178,7 +181,7 @@ Regression models with different variations of predictors
     ## Multiple R-squared:  0.9499, Adjusted R-squared:  0.9488 
     ## F-statistic: 928.5 on 5 and 245 DF,  p-value: < 2.2e-16
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_dec_grow-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_dec_grow-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_dec_grow-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_dec_grow-2.png)
 
     ## 
     ##  Durbin-Watson test
@@ -215,7 +218,7 @@ after 1995:**
     ## Multiple R-squared:  0.9629, Adjusted R-squared:  0.9621 
     ## F-statistic:  1272 on 5 and 245 DF,  p-value: < 2.2e-16
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_mo_moper_dec_grow-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_mo_moper_dec_grow-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_mo_moper_dec_grow-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_mo_moper_dec_grow-2.png)
 
     ## 
     ##  Durbin-Watson test
@@ -251,7 +254,7 @@ spike + growth after 1995 (all dummy features):**
     ## Multiple R-squared:  0.9635, Adjusted R-squared:  0.9626 
     ## F-statistic:  1073 on 6 and 244 DF,  p-value: < 2.2e-16
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_moper_dec_grow-1.png)![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/yr_qt_mo_moper_dec_grow-2.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_moper_dec_grow-1.png)![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/yr_qt_mo_moper_dec_grow-2.png)
 
     ## 
     ##  Durbin-Watson test
@@ -273,7 +276,7 @@ Model with all possible variables hav the best results by all the
 metrics between compared models, so we'll use it to try to predict sales
 on the test set.
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/test-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/test-1.png)
 
     ##           MSE      MAE       MAPE
     ## [1,] 100894.3 262.2885 0.05931864
@@ -289,11 +292,11 @@ Time series decomposition
 Applying moving-average smoothing to extract the trend
 ------------------------------------------------------
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/ma-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/ma-1.png)
 
 Moving-average of order 12 extracts appropriate trend.
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/loess-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/loess-1.png)
 
 Trend, extracted by loess regression is smoother and has no NA values,
 unlike in moving-average technique, so I'll use fitted values of loess
@@ -302,12 +305,12 @@ regression to compute seasonal & irregular components.
 Seasonal & irregular components computations. Time-series decomposition
 -----------------------------------------------------------------------
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/decomposition-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/decomposition-1.png)
 
 Autocorrelation function plot of irregular time-series component
 ----------------------------------------------------------------
 
-![](Anton_Pysanka_DSWS_2018_task_files/figure-markdown_strict/ACF_resid-1.png)
+![](BeerWineUS_92_17_modeling_files/figure-markdown_strict/ACF_resid-1.png)
 
 At autocorrelation function plot we see that there's still unextracted
 information at the 12-th lag of irregular component, so probably we

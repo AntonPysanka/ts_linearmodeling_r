@@ -8,6 +8,7 @@ output: md_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+# Regression-type modeling & time series decomposition
 
 ##Data loading
 
@@ -262,7 +263,7 @@ Sadly, but we highly underestimated growth of the sales and volatility on the te
 ```{r ma, echo=FALSE}
 library(forecast)
 plot(x=index(BeerWineUS_xts), y=BeerWineUS_ts,
-     main = 'Moving-averages of different orders with original time series',
+     main = 'Moving-averages of different orders & original time series',
      col = 'lightgrey',
      type = 'l', xlab='Years (monthly)', ylab='Retail sales')
 MA3 <- ma(BeerWineUS_ts, 3, centre = T)
